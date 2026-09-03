@@ -37,10 +37,20 @@ module uart_serializer (
         else begin
 
             if (done == 1 && start == 1) begin
-                register <= registerIn;
+                register[0] <= registerIn[1];
+                register[1] <= registerIn[2];
+                register[2] <= registerIn[3];
+                register[3] <= registerIn[4];
+                register[4] <= registerIn[5];
+                register[5] <= registerIn[6];
+                register[6] <= registerIn[7];
+                register[7] <= registerIn[8];
+                register[8] <= registerIn[9];
+                register[9] <= registerIn[10];
+                register[10] <= 1'b0;
                 done <= 1'b0;
-                count <= 4'b0;
-                Dout <= 1'b1;
+                count <= 4'b1;
+                Dout <= registerIn[0];
             end
 
             else if (done == 0 && mode == 0) begin
@@ -170,124 +180,61 @@ module uart_fsm (
 
     input serializer_done,
 
-    output reg buffer_read_en,
+    output logic buffer_read_en,
     output busy,
-    output reg serializer_start,
-    output reg [10:0] serializer_data
+    output logic serializer_start,
+    output logic [10:0] serializer_data
 );
 
-    reg [2:0] state;
-    reg [7:0] data_reg;
-
+    logic [2:0] state;
     logic parity_bit;
 
-    uart_paritycalc parity (
-        .parallel_register(data_reg),
-        .parity_type(parity_type),
-        .parity_bit(parity_bit)
-    );
+    assign parity_bit = (^buffer_data) ^ parity_type;
+    assign busy = (state != 3'b000);
+    assign serializer_start = (state == 3'b000) && buffer_ready && serializer_done;
+    assign buffer_read_en = (state == 3'b000) && buffer_ready;
+
+    always_comb begin
+        serializer_data[0] = 1'b0;
+        serializer_data[8:1] = buffer_data;
+        if (mode == 1'b0) begin
+            serializer_data[9] = parity_bit;
+            serializer_data[10] = 1'b1;
+        end
+        else begin
+            serializer_data[9] = 1'b1;
+            serializer_data[10] = 1'b0;
+        end
+    end
 
     typedef enum logic [2:0] {
-        IDLE     = 3'b000,
-        READ     = 3'b001,
-        LOAD     = 3'b010,
-        START    = 3'b011,
+        IDLE       = 3'b000,
         WAIT_START = 3'b100,
         WAIT_DONE  = 3'b101
     } state_t;
 
-    assign busy = (state != IDLE);
-
     always_ff @(posedge clk or negedge rst) begin
 
         if (!rst) begin
-
             state <= IDLE;
-            data_reg <= 8'b0;
-            buffer_read_en <= 1'b0;
-            serializer_start <= 1'b0;
-            serializer_data <= 11'b0;
-
         end
 
         else begin
-
-            buffer_read_en <= 1'b0;
             case (state)
-
                 IDLE: begin
-                    serializer_start <= 1'b0;
-                    if (buffer_ready)
-                        state <= READ;
+                    if (buffer_ready && serializer_done)
+                        state <= WAIT_START;
                 end
-                READ: begin
-                    serializer_start <= 1'b0;
-
-                    buffer_read_en <= 1'b1;
-                    data_reg <= buffer_data;
-
-                    state <= LOAD;
-
-                end
-                LOAD: begin
-
-                    serializer_start <= 1'b0;
-
-                    serializer_data[0] <= 1'b0;
-                    serializer_data[8:1] <= data_reg;
-
-                    if (mode == 1'b0) begin
-                        serializer_data[9] <= parity_bit;
-                        serializer_data[10] <= 1'b1;
-                    end
-
-                    else begin
-                        serializer_data[9] <= 1'b1;
-                        serializer_data[10] <= 1'b0;
-                    end
-
-                    state <= START;
-
-                end
-                START: begin
-
-                    serializer_start <= 1'b1;
-
-                    state <= WAIT_START;
-
-                end
-
-
                 WAIT_START: begin
-
-                    serializer_start <= 1'b1;
-
                     if (!serializer_done)
                         state <= WAIT_DONE;
-
                 end
-
-
                 WAIT_DONE: begin
-
-                    serializer_start <= 1'b0;
-
                     if (serializer_done)
                         state <= IDLE;
-
                 end
-
-
-                default: begin
-
-                    state <= IDLE;
-                    buffer_read_en <= 1'b0;
-                    serializer_start <= 1'b0;
-
-                end
-
+                default: state <= IDLE;
             endcase
-
         end
 
     end
