@@ -1,0 +1,5 @@
+*
+!uart_tx.sv
+!uart_rx.sv
+!uart_loopback_tb.sv
+!.gitignore
