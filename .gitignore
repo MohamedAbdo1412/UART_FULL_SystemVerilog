@@ -3,3 +3,8 @@
 !uart_rx.sv
 !uart_loopback_tb.sv
 !.gitignore
+!assets/
+!assets/pass_screenshot.png
+!assets/waves_screenshot.png
+!project_report.pdf
+!README.md
